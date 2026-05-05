@@ -13,6 +13,11 @@ spec:
   policies:
     auth:
       key: openai-key
+  transformation:
+    response:
+      add:
+        - name: x-backend-model
+          value: "default(backend.model, \"unknown\")"
 ---
 apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
