@@ -16,6 +16,9 @@ var (
 
 	// ControlPlaneTLSManifestPath returns the path to a manifest with TLS enabled for xDS communication
 	ControlPlaneTLSManifestPath = ManifestPath("controlplane-tls-helm.yaml")
+
+	// ControlPlaneTLSPlaintextManifestPath returns the path to a manifest with plaintext mode for xDS communication
+	ControlPlaneTLSPlaintextManifestPath = ManifestPath("controlplane-plaintext-helm.yaml")
 )
 
 // ManifestPath returns the absolute path to a manifest file.
