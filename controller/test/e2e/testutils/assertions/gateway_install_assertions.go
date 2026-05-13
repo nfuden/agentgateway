@@ -4,6 +4,7 @@ package assertions
 
 import (
 	"context"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -12,7 +13,7 @@ const agentgatewayLabelSelector = "app.kubernetes.io/name=agentgateway"
 
 func (p *Provider) EventuallyGatewayInstallSucceeded(ctx context.Context) {
 	p.expectInstallContextDefined()
-
+	time.Sleep(time.Minute * 2)
 	p.EventuallyPodsRunning(ctx, p.installContext.InstallNamespace,
 		metav1.ListOptions{
 			LabelSelector: agentgatewayLabelSelector,
