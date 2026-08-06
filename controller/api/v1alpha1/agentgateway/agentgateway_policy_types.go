@@ -2731,7 +2731,8 @@ type ExtProcConditional struct {
 	Policy ExtProc `json:"policy"`
 }
 
-// +kubebuilder:validation:XValidation:rule="has(self.conditional) ? (!has(self.backendRef) && !has(self.url)) : [has(self.backendRef),has(self.url)].filter(x,x==true).size() == 1",message="exactly one of backendRef or url must be set unless conditional is set"
+// +kubebuilder:validation:ConditionalPolicy
+// +kubebuilder:validation:XValidation:rule="has(self.conditional) ? true : [has(self.backendRef),has(self.url)].filter(x,x==true).size() == 1",message="exactly one of backendRef or url is required"
 type ExtProcOrConditional struct {
 	// +optional
 	ExtProc `json:",inline"`
@@ -2783,7 +2784,8 @@ type ExtAuthConditional struct {
 	Policy ExtAuth `json:"policy"`
 }
 
-// +kubebuilder:validation:XValidation:rule="has(self.conditional) ? (!has(self.backendRef) && !has(self.url)) : [has(self.backendRef),has(self.url)].filter(x,x==true).size() == 1",message="exactly one of backendRef or url must be set unless conditional is set"
+// +kubebuilder:validation:ConditionalPolicy
+// +kubebuilder:validation:XValidation:rule="has(self.conditional) ? true : [has(self.backendRef),has(self.url)].filter(x,x==true).size() == 1",message="exactly one of backendRef or url is required"
 // +kubebuilder:validation:XValidation:rule="has(self.conditional) || [has(self.grpc),has(self.http)].filter(x,x==true).size() == 1",message="exactly one of the fields in [grpc http] must be set"
 type ExtAuthOrConditional struct {
 	// +optional

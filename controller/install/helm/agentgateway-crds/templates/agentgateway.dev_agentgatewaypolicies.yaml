@@ -8491,10 +8491,8 @@ spec:
                         type: string
                     type: object
                     x-kubernetes-validations:
-                    - message: exactly one of backendRef or url must be set unless
-                        conditional is set
-                      rule: 'has(self.conditional) ? (!has(self.backendRef) && !has(self.url))
-                        : [has(self.backendRef),has(self.url)].filter(x,x==true).size()
+                    - message: exactly one of backendRef or url is required
+                      rule: 'has(self.conditional) ? true : [has(self.backendRef),has(self.url)].filter(x,x==true).size()
                         == 1'
                     - message: exactly one of the fields in [grpc http] must be set
                       rule: has(self.conditional) || [has(self.grpc),has(self.http)].filter(x,x==true).size()
@@ -8507,6 +8505,9 @@ spec:
                     - message: http.path may not be set when url includes a path
                       rule: '!has(self.url) || !self.url.matches(''^https?://[^/?#]+/'')
                         || !has(self.http) || !has(self.http.path)'
+                    - message: conditional cannot be set with any other field
+                      rule: 'has(self.conditional) ? [has(self.backendRef),has(self.cache),has(self.failureMode),has(self.forwardBody),has(self.grpc),has(self.http),has(self.url)].filter(x,x==true).size()
+                        == 0 : true'
                   extProc:
                     description: External processing configuration for the policy.
                     properties:
@@ -8911,13 +8912,14 @@ spec:
                         type: string
                     type: object
                     x-kubernetes-validations:
-                    - message: exactly one of backendRef or url must be set unless
-                        conditional is set
-                      rule: 'has(self.conditional) ? (!has(self.backendRef) && !has(self.url))
-                        : [has(self.backendRef),has(self.url)].filter(x,x==true).size()
+                    - message: exactly one of backendRef or url is required
+                      rule: 'has(self.conditional) ? true : [has(self.backendRef),has(self.url)].filter(x,x==true).size()
                         == 1'
                     - message: url must not include a path
                       rule: '!has(self.url) || self.url.matches(''^https?://[^/?#]+$'')'
+                    - message: conditional cannot be set with any other field
+                      rule: 'has(self.conditional) ? [has(self.backendRef),has(self.failureMode),has(self.metadataContext),has(self.processingOptions),has(self.requestAttributes),has(self.responseAttributes),has(self.url)].filter(x,x==true).size()
+                        == 0 : true'
                   headerModifiers:
                     description: Request and response header modification policy.
                     properties:
