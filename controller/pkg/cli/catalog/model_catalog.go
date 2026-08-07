@@ -29,13 +29,32 @@ type Provider struct {
 }
 
 type Model struct {
-	Rates Rates    `json:"rates,omitzero"`
-	Tiers []Tier   `json:"tiers,omitempty"`
-	Tags  []string `json:"tags,omitempty"`
+	Rates        Rates          `json:"rates,omitzero"`
+	Tiers        []Tier         `json:"tiers,omitempty"`
+	Capabilities Capabilities   `json:"capabilities,omitzero"`
+	Tags         []string       `json:"tags,omitempty"`
+	Metadata     map[string]any `json:"metadata,omitempty"`
 }
 
 func (m Model) IsZero() bool {
-	return m.Rates.IsZero() && len(m.Tiers) == 0 && len(m.Tags) == 0
+	return m.Rates.IsZero() && len(m.Tiers) == 0 && m.Capabilities.IsZero() && len(m.Tags) == 0 && len(m.Metadata) == 0
+}
+
+// Capabilities are well-known structured model attributes.
+type Capabilities struct {
+	Reasoning        *bool             `json:"reasoning,omitempty"`
+	ReasoningOptions []ReasoningOption `json:"reasoningOptions,omitempty"`
+	ToolCall         *bool             `json:"toolCall,omitempty"`
+}
+
+func (c Capabilities) IsZero() bool {
+	return c.Reasoning == nil && len(c.ReasoningOptions) == 0 && c.ToolCall == nil
+}
+
+// ReasoningOption is a supported reasoning mode (e.g. effort) and its levels.
+type ReasoningOption struct {
+	Type   string   `json:"type"`
+	Values []string `json:"values,omitempty"`
 }
 
 type Rates struct {

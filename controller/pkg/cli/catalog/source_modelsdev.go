@@ -57,10 +57,18 @@ type modelsDevProvider struct {
 }
 
 type modelsDevModel struct {
-	ID     string         `json:"id"`
-	Name   string         `json:"name"`
-	Status string         `json:"status"`
-	Cost   *modelsDevCost `json:"cost"`
+	ID               string                     `json:"id"`
+	Name             string                     `json:"name"`
+	Status           string                     `json:"status"`
+	Cost             *modelsDevCost             `json:"cost"`
+	Reasoning        *bool                      `json:"reasoning"`
+	ToolCall         *bool                      `json:"tool_call"`
+	ReasoningOptions []modelsDevReasoningOption `json:"reasoning_options"`
+}
+
+type modelsDevReasoningOption struct {
+	Type   string   `json:"type"`
+	Values []string `json:"values"`
 }
 
 type modelsDevRates struct {
@@ -200,6 +208,16 @@ func modelsDevBuildModel(provider, model string, m modelsDevModel, warn func(for
 			return Model{}, err
 		}
 		entry.Tiers = tiers
+	}
+
+	var reasoningOptions []ReasoningOption
+	for _, o := range m.ReasoningOptions {
+		reasoningOptions = append(reasoningOptions, ReasoningOption{Type: o.Type, Values: o.Values})
+	}
+	entry.Capabilities = Capabilities{
+		Reasoning:        m.Reasoning,
+		ReasoningOptions: reasoningOptions,
+		ToolCall:         m.ToolCall,
 	}
 
 	return entry, nil
