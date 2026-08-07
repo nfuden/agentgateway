@@ -80,6 +80,18 @@ fn models_dev_transform(
 			let entry = model::Model {
 				rates: models_dev_rates(&cost.rates).with_context(|| format!("{gateway_id}/{model_id}"))?,
 				tiers: models_dev_tiers(&cost.tiers).with_context(|| format!("{gateway_id}/{model_id}"))?,
+				capabilities: model::Capabilities {
+					reasoning: model.reasoning,
+					reasoning_options: model
+						.reasoning_options
+						.iter()
+						.map(|o| model::ReasoningOption {
+							r#type: o.r#type.clone(),
+							values: o.values.clone().unwrap_or_default(),
+						})
+						.collect(),
+					tool_call: model.tool_call,
+				},
 				..Default::default()
 			};
 			if entry.rates.is_empty() && entry.tiers.is_empty() {
@@ -111,6 +123,16 @@ struct ModelsDevModel {
 	#[serde(default)]
 	status: String,
 	cost: Option<ModelsDevCost>,
+	reasoning: Option<bool>,
+	tool_call: Option<bool>,
+	#[serde(default)]
+	reasoning_options: Vec<ModelsDevReasoningOption>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ModelsDevReasoningOption {
+	r#type: String,
+	values: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize)]

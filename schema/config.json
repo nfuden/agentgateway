@@ -537,6 +537,53 @@
       },
       "additionalProperties": false
     },
+    "Capabilities": {
+      "type": "object",
+      "properties": {
+        "reasoning": {
+          "description": "Whether the model supports reasoning.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "reasoningOptions": {
+          "description": "Supported reasoning configuration modes and their levels.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ReasoningOption"
+          }
+        },
+        "toolCall": {
+          "description": "Whether the model supports tool calling.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "ReasoningOption": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "description": "Reasoning configuration mode (e.g. `effort`, `toggle`, `budget_tokens`).",
+          "type": "string"
+        },
+        "values": {
+          "description": "Discrete values for the mode (e.g. effort levels `low`, `medium`, `high`).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ]
+    },
     "Model": {
       "type": "object",
       "properties": {
@@ -551,6 +598,10 @@
             "$ref": "#/$defs/Tier"
           }
         },
+        "capabilities": {
+          "description": "Well-known structured model capabilities.",
+          "$ref": "#/$defs/Capabilities"
+        },
         "tags": {
           "description": "Freeform capability/routing tags (e.g. `mantle`/`runtime` marking AWS Bedrock endpoints).",
           "type": "array",
@@ -558,6 +609,11 @@
           "items": {
             "type": "string"
           }
+        },
+        "metadata": {
+          "description": "Arbitrary, nestable extension data for attributes not modeled as well-known fields.",
+          "type": "object",
+          "additionalProperties": true
         }
       },
       "additionalProperties": false

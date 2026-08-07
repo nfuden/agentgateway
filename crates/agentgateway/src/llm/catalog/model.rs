@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{apply, schema};
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct Catalog {
@@ -46,7 +46,9 @@ impl Catalog {
 						if !om.tiers.is_empty() {
 							bm.tiers = om.tiers;
 						}
+						bm.capabilities = bm.capabilities.overlay(&om.capabilities);
 						bm.tags.extend(om.tags);
+						bm.metadata.extend(om.metadata);
 						bm
 					},
 					None => om,
@@ -68,7 +70,7 @@ pub fn from_json(s: &str) -> anyhow::Result<Catalog> {
 	Ok(catalog)
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct Provider {
@@ -78,7 +80,7 @@ pub struct Provider {
 }
 
 #[apply(schema!)]
-#[derive(PartialEq, Eq, Default)]
+#[derive(PartialEq, Default)]
 pub struct Model {
 	/// Base pricing rates for this model.
 	#[serde(default, skip_serializing_if = "Rates::is_empty")]
@@ -86,9 +88,57 @@ pub struct Model {
 	/// Context-length pricing tiers that override the base rates.
 	#[serde(default, skip_serializing_if = "Vec::is_empty")]
 	pub tiers: Vec<Tier>,
+	/// Well-known structured model capabilities.
+	#[serde(default, skip_serializing_if = "Capabilities::is_empty")]
+	pub capabilities: Capabilities,
 	/// Freeform capability/routing tags (e.g. `mantle`/`runtime` marking AWS Bedrock endpoints).
 	#[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
 	pub tags: BTreeSet<String>,
+	/// Arbitrary, nestable extension data for attributes not modeled as well-known fields.
+	#[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+	pub metadata: BTreeMap<String, serde_json::Value>,
+}
+
+#[apply(schema!)]
+#[derive(PartialEq, Eq, Default)]
+pub struct Capabilities {
+	/// Whether the model supports reasoning.
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub reasoning: Option<bool>,
+	/// Supported reasoning configuration modes and their levels.
+	#[serde(default, skip_serializing_if = "Vec::is_empty")]
+	pub reasoning_options: Vec<ReasoningOption>,
+	/// Whether the model supports tool calling.
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub tool_call: Option<bool>,
+}
+
+impl Capabilities {
+	pub fn is_empty(&self) -> bool {
+		*self == Capabilities::default()
+	}
+
+	pub fn overlay(&self, delta: &Capabilities) -> Capabilities {
+		Capabilities {
+			reasoning: delta.reasoning.or(self.reasoning),
+			reasoning_options: if delta.reasoning_options.is_empty() {
+				self.reasoning_options.clone()
+			} else {
+				delta.reasoning_options.clone()
+			},
+			tool_call: delta.tool_call.or(self.tool_call),
+		}
+	}
+}
+
+#[apply(schema!)]
+#[derive(PartialEq, Eq)]
+pub struct ReasoningOption {
+	/// Reasoning configuration mode (e.g. `effort`, `toggle`, `budget_tokens`).
+	pub r#type: String,
+	/// Discrete values for the mode (e.g. effort levels `low`, `medium`, `high`).
+	#[serde(default, skip_serializing_if = "Vec::is_empty")]
+	pub values: Vec<String>,
 }
 
 #[apply(schema!)]
@@ -385,6 +435,60 @@ mod tests {
 		assert_eq!(model.rates.input, Some(m("3")), "base cost preserved");
 		assert_eq!(model.rates.output, Some(m("6")));
 		assert!(model.tags.contains("mantle"), "overlay tag applied");
+	}
+
+	#[test]
+	fn capabilities_parse_and_deep_merge() {
+		let base = from_json(
+			r#"{"providers":{"openai":{"models":{"m":{"capabilities":{"reasoning":true,"reasoningOptions":[{"type":"effort","values":["low","medium","high"]}],"toolCall":false}}}}}}"#,
+		)
+		.unwrap();
+		let caps = base.resolve("openai", "m").unwrap().capabilities.clone();
+		assert_eq!(caps.reasoning, Some(true));
+		assert_eq!(caps.tool_call, Some(false));
+		assert_eq!(caps.reasoning_options.len(), 1);
+		assert_eq!(caps.reasoning_options[0].r#type, "effort");
+		assert_eq!(caps.reasoning_options[0].values, ["low", "medium", "high"]);
+
+		// An overlay that only sets one capability (plus a tag) keeps the rest and wins its field.
+		let overlay = from_json(
+			r#"{"providers":{"openai":{"models":{"m":{"capabilities":{"toolCall":true},"tags":["x"]}}}}}"#,
+		)
+		.unwrap();
+		let model = base.override_with(overlay);
+		let model = model.resolve("openai", "m").unwrap();
+		assert_eq!(
+			model.capabilities.reasoning,
+			Some(true),
+			"base capability kept"
+		);
+		assert_eq!(
+			model.capabilities.tool_call,
+			Some(true),
+			"overlay capability wins"
+		);
+		assert!(model.tags.contains("x"));
+	}
+
+	#[test]
+	fn metadata_holds_arbitrary_nested_data_and_merges() {
+		let base = from_json(
+			r#"{"providers":{"openai":{"models":{"m":{"metadata":{"a":{"nested":[1,2]},"keep":true}}}}}}"#,
+		)
+		.unwrap();
+		assert_eq!(
+			base.resolve("openai", "m").unwrap().metadata["a"]["nested"],
+			serde_json::json!([1, 2])
+		);
+
+		// Overlay merges keys: the overlay's key wins, base-only keys are kept.
+		let overlay =
+			from_json(r#"{"providers":{"openai":{"models":{"m":{"metadata":{"a":"replaced"}}}}}}"#)
+				.unwrap();
+		let merged = base.override_with(overlay);
+		let md = &merged.resolve("openai", "m").unwrap().metadata;
+		assert_eq!(md["a"], serde_json::json!("replaced"), "overlay key wins");
+		assert_eq!(md["keep"], serde_json::json!(true), "base key kept");
 	}
 
 	#[test]

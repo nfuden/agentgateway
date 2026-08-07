@@ -32,7 +32,14 @@
 |`config.modelCatalog[].inline.providers.*.models.*.tiers[].rates.reasoning`|string|Cost per 1M reasoning tokens. Falls back to the output rate if unset.|
 |`config.modelCatalog[].inline.providers.*.models.*.tiers[].rates.inputAudio`|string|Cost per 1M input audio tokens. Falls back to the input rate if unset.|
 |`config.modelCatalog[].inline.providers.*.models.*.tiers[].rates.outputAudio`|string|Cost per 1M output audio tokens. Falls back to the output rate if unset.|
+|`config.modelCatalog[].inline.providers.*.models.*.capabilities`|object|Well-known structured model capabilities.|
+|`config.modelCatalog[].inline.providers.*.models.*.capabilities.reasoning`|boolean|Whether the model supports reasoning.|
+|`config.modelCatalog[].inline.providers.*.models.*.capabilities.reasoningOptions`|[]object|Supported reasoning configuration modes and their levels.|
+|`config.modelCatalog[].inline.providers.*.models.*.capabilities.reasoningOptions[].type`|string|Reasoning configuration mode (e.g. `effort`, `toggle`, `budget_tokens`).|
+|`config.modelCatalog[].inline.providers.*.models.*.capabilities.reasoningOptions[].values`|[]string|Discrete values for the mode (e.g. effort levels `low`, `medium`, `high`).|
+|`config.modelCatalog[].inline.providers.*.models.*.capabilities.toolCall`|boolean|Whether the model supports tool calling.|
 |`config.modelCatalog[].inline.providers.*.models.*.tags`|[]string|Freeform capability/routing tags (e.g. `mantle`/`runtime` marking AWS Bedrock endpoints).|
+|`config.modelCatalog[].inline.providers.*.models.*.metadata`|object|Arbitrary, nestable extension data for attributes not modeled as well-known fields.|
 |`config.database`|object|Primary database used by local runtime features.|
 |`config.database.url`|string|Connection URL for the request log database. A postgres:// or postgresql:// URL uses Postgres; any other value is treated as a SQLite database.|
 |`config.database.maxConnections`|integer|Maximum number of connections to open in this database's connection pool. Defaults to 5.<br>When the request log and config stores have matching database settings, they share one pool<br>with this limit.|

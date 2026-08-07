@@ -127,7 +127,7 @@ func TestTransformMatchesGoldenCatalog(t *testing.T) {
 		"agentgateway",
 		"src",
 		"llm",
-		"cost",
+		"catalog",
 		"testdata",
 		"model_catalog.golden.json",
 	))
@@ -176,5 +176,34 @@ func TestTransformMissingProviderWarnsAndEmptyErrors(t *testing.T) {
 	}
 	if len(warns) != 1 || !strings.Contains(warns[0], "not found") {
 		t.Fatalf("expected not-found warning, got %v", warns)
+	}
+}
+
+func TestTransformIncludesCapabilities(t *testing.T) {
+	tru, fls := true, false
+	api := map[string]modelsDevProvider{
+		"openai": {Models: map[string]modelsDevModel{
+			"m": {
+				Cost:             &modelsDevCost{modelsDevRates: modelsDevRates{Input: json.Number("1")}},
+				Reasoning:        &tru,
+				ToolCall:         &fls,
+				ReasoningOptions: []modelsDevReasoningOption{{Type: "effort", Values: []string{"low", "medium", "high"}}},
+			},
+		}},
+	}
+	cat, _, err := modelsDevTransform(api, []string{"openai"}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	caps := cat.Providers["openai"].Models["m"].Capabilities
+	if caps.Reasoning == nil || !*caps.Reasoning {
+		t.Fatalf("reasoning = %v, want true", caps.Reasoning)
+	}
+	if caps.ToolCall == nil || *caps.ToolCall {
+		t.Fatalf("toolCall = %v, want false", caps.ToolCall)
+	}
+	if len(caps.ReasoningOptions) != 1 || caps.ReasoningOptions[0].Type != "effort" ||
+		!reflect.DeepEqual(caps.ReasoningOptions[0].Values, []string{"low", "medium", "high"}) {
+		t.Fatalf("reasoningOptions = %+v, want [effort low/medium/high]", caps.ReasoningOptions)
 	}
 }
