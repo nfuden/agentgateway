@@ -8238,11 +8238,24 @@
             "string",
             "null"
           ]
+        },
+        "providerPreference": {
+          "description": "Which endpoint to prefer (Runtime vs Mantle).",
+          "$ref": "#/$defs/BedrockProviderPreference",
+          "default": "runtimePreferred"
         }
       },
       "additionalProperties": false,
       "required": [
         "region"
+      ]
+    },
+    "BedrockProviderPreference": {
+      "type": "string",
+      "enum": [
+        "runtimePreferred",
+        "mantleOnly",
+        "runtimeOnly"
       ]
     },
     "AzureProvider": {
@@ -10814,6 +10827,11 @@
             "string",
             "null"
           ]
+        },
+        "bedrockProviderPreference": {
+          "description": "Which Bedrock endpoint to prefer (Runtime vs Mantle).",
+          "$ref": "#/$defs/BedrockProviderPreference",
+          "default": "runtimePreferred"
         },
         "vertexRegion": {
           "description": "Google Cloud region to use for the Vertex AI provider.",

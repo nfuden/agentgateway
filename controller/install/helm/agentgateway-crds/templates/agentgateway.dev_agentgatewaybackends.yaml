@@ -226,6 +226,18 @@ spec:
                                     maxLength: 256
                                     minLength: 1
                                     type: string
+                                  providerPreference:
+                                    default: RuntimePreferred
+                                    description: |-
+                                      ProviderPreference selects which Bedrock API surface to prefer.
+                                      `RuntimePreferred` (the default) uses Runtime and routes to Mantle only for
+                                      models the catalog tags `mantle` but not `runtime`; `MantleOnly` and
+                                      `RuntimeOnly` force one endpoint.
+                                    enum:
+                                    - MantleOnly
+                                    - RuntimeOnly
+                                    - RuntimePreferred
+                                    type: string
                                   region:
                                     default: us-east-1
                                     description: |-
@@ -6956,6 +6968,18 @@ spec:
                               If unset, the model name is taken from the request.
                             maxLength: 256
                             minLength: 1
+                            type: string
+                          providerPreference:
+                            default: RuntimePreferred
+                            description: |-
+                              ProviderPreference selects which Bedrock API surface to prefer.
+                              `RuntimePreferred` (the default) uses Runtime and routes to Mantle only for
+                              models the catalog tags `mantle` but not `runtime`; `MantleOnly` and
+                              `RuntimeOnly` force one endpoint.
+                            enum:
+                            - MantleOnly
+                            - RuntimeOnly
+                            - RuntimePreferred
                             type: string
                           region:
                             default: us-east-1
