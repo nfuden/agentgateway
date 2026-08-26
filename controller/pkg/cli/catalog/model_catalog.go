@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/shopspring/decimal"
@@ -24,6 +25,35 @@ func (c *ModelCatalog) Validate() error {
 	return nil
 }
 
+// Merge overlays each catalog onto the previous, left to right, so later
+// catalogs take precedence. Merging is deep and per field: a source that
+// contributes only tags (or only some rates) keeps the values earlier sources
+// set for everything it leaves unspecified. This mirrors the data-plane merge
+// in crates/agentgateway/src/llm/catalog/model.rs (Catalog::override_with) so
+// the catalog agctl emits and the one the proxy assembles agree.
+func Merge(catalogs ...*ModelCatalog) *ModelCatalog {
+	out := &ModelCatalog{Providers: map[string]Provider{}}
+	for _, cat := range catalogs {
+		if cat != nil {
+			out.overrideWith(cat)
+		}
+	}
+	return out
+}
+
+func (c *ModelCatalog) overrideWith(overlay *ModelCatalog) {
+	for pid, op := range overlay.Providers {
+		base, ok := c.Providers[pid]
+		if !ok || base.Models == nil {
+			base = Provider{Models: map[string]Model{}}
+		}
+		for mid, om := range op.Models {
+			base.Models[mid] = base.Models[mid].overrideWith(om)
+		}
+		c.Providers[pid] = base
+	}
+}
+
 type Provider struct {
 	Models map[string]Model `json:"models"`
 }
@@ -36,6 +66,35 @@ type Model struct {
 
 func (m Model) IsZero() bool {
 	return m.Rates.IsZero() && len(m.Tiers) == 0 && len(m.Tags) == 0
+}
+
+// overrideWith deep-merges overlay onto m: rates are overlaid field by field,
+// a non-empty tier set replaces m's tiers wholesale (tiers are ordered and only
+// meaningful together), and tags are unioned.
+func (m Model) overrideWith(overlay Model) Model {
+	m.Rates = m.Rates.overlay(overlay.Rates)
+	if len(overlay.Tiers) > 0 {
+		m.Tiers = overlay.Tiers
+	}
+	if len(overlay.Tags) > 0 {
+		m.Tags = mergeTags(m.Tags, overlay.Tags)
+	}
+	return m
+}
+
+// mergeTags returns the sorted, de-duplicated union of two tag lists.
+func mergeTags(base, overlay []string) []string {
+	seen := make(map[string]struct{}, len(base)+len(overlay))
+	out := make([]string, 0, len(base)+len(overlay))
+	for _, tag := range slices.Concat(base, overlay) {
+		if _, dup := seen[tag]; dup {
+			continue
+		}
+		seen[tag] = struct{}{}
+		out = append(out, tag)
+	}
+	slices.Sort(out)
+	return out
 }
 
 type Rates struct {
@@ -57,6 +116,26 @@ type Money string
 
 func (r Rates) IsZero() bool {
 	return r == Rates{}
+}
+
+// overlay returns r with every rate that delta sets replaced by delta's value;
+// rates delta leaves empty fall through to r.
+func (r Rates) overlay(delta Rates) Rates {
+	pick := func(base, d Money) Money {
+		if d != "" {
+			return d
+		}
+		return base
+	}
+	return Rates{
+		Input:       pick(r.Input, delta.Input),
+		Output:      pick(r.Output, delta.Output),
+		CacheRead:   pick(r.CacheRead, delta.CacheRead),
+		CacheWrite:  pick(r.CacheWrite, delta.CacheWrite),
+		Reasoning:   pick(r.Reasoning, delta.Reasoning),
+		InputAudio:  pick(r.InputAudio, delta.InputAudio),
+		OutputAudio: pick(r.OutputAudio, delta.OutputAudio),
+	}
 }
 
 func (m Money) Decimal() (decimal.Decimal, error) {

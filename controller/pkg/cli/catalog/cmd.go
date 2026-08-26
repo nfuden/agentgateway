@@ -24,7 +24,7 @@ Use subcommands to import catalog data from supported sources.`,
 
 type importFlags struct {
 	providers []string
-	source    string
+	sources   []string
 	out       string
 	pretty    bool
 	legacy    bool
@@ -52,17 +52,22 @@ func importSourceList() string {
 
 func importCmd() *cobra.Command {
 	f := &importFlags{
-		source: modelsDevSourceName,
+		sources: []string{modelsDevSourceName},
 	}
 	cmd := &cobra.Command{
 		Use:   "import",
 		Short: "Import a model catalog",
 		Long: `Import a model catalog.
 
+When --source names more than one source, their catalogs are merged left to
+right: later sources take precedence, overlaying earlier ones field by field so
+a source that supplies only tags keeps the rates an earlier source supplied.
+
 Examples:
 	agctl catalog import > catalog.json
 	agctl catalog import --out ./costs/catalog.json
-	agctl catalog import --source models.dev --providers anthropic,google,openai`,
+	agctl catalog import --source models.dev --providers anthropic,google,openai
+	agctl catalog import --source models.dev,bedrock`,
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -70,7 +75,7 @@ Examples:
 		},
 	}
 
-	cmd.Flags().StringVar(&f.source, "source", f.source, "import source ("+importSourceList()+")")
+	cmd.Flags().StringSliceVar(&f.sources, "source", f.sources, "import sources, merged left to right with later taking precedence ("+importSourceList()+")")
 	cmd.Flags().StringSliceVar(&f.providers, "providers", nil, "source provider ids to import (default: every provider the proxy supports)")
 	cmd.Flags().BoolVar(&f.legacy, "legacy", false, "include deprecated models")
 	cmd.Flags().BoolVar(&f.pretty, "pretty", false, "pretty-print the output JSON")
@@ -81,29 +86,37 @@ Examples:
 
 func runImport(cmd *cobra.Command, f *importFlags) error {
 	ctx := cmd.Context()
-	if f.source == "" {
-		return fmt.Errorf("source is required; pass --source with one of: %s", importSourceList())
-	}
-	src, ok := importSources[f.source]
-	if !ok {
-		return fmt.Errorf("unsupported source %q (supported sources: %s)", f.source, importSourceList())
+	if len(f.sources) == 0 {
+		return fmt.Errorf("source is required; pass --source with one or more of: %s", importSourceList())
 	}
 
-	cat, warns, err := src(ctx, importOptions{
-		providers: f.providers,
-		legacy:    f.legacy,
-	})
-	if err != nil {
-		return err
+	catalogs := make([]*ModelCatalog, 0, len(f.sources))
+	var warns []string
+	for _, name := range f.sources {
+		src, ok := importSources[name]
+		if !ok {
+			return fmt.Errorf("unsupported source %q (supported sources: %s)", name, importSourceList())
+		}
+		cat, srcWarns, err := src(ctx, importOptions{
+			providers: f.providers,
+			legacy:    f.legacy,
+		})
+		if err != nil {
+			return fmt.Errorf("source %q: %w", name, err)
+		}
+		catalogs = append(catalogs, cat)
+		warns = append(warns, srcWarns...)
 	}
-	if err := cat.Validate(); err != nil {
+
+	merged := Merge(catalogs...)
+	if err := merged.Validate(); err != nil {
 		return fmt.Errorf("invalid catalog: %w", err)
 	}
 	for _, w := range warns {
 		fmt.Fprintln(cmd.ErrOrStderr(), "warning:", w)
 	}
 
-	data, err := marshalCatalog(cat, f.pretty)
+	data, err := marshalCatalog(merged, f.pretty)
 	if err != nil {
 		return err
 	}
@@ -115,6 +128,6 @@ func runImport(cmd *cobra.Command, f *importFlags) error {
 	} else if err := os.WriteFile(dest, data, 0o600); err != nil {
 		return fmt.Errorf("write %s: %w", dest, err)
 	}
-	fmt.Fprintf(cmd.ErrOrStderr(), "imported %d providers\n", len(cat.Providers))
+	fmt.Fprintf(cmd.ErrOrStderr(), "imported %d providers from %d source(s)\n", len(merged.Providers), len(f.sources))
 	return nil
 }
