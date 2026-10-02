@@ -574,17 +574,15 @@ mod ratelimit {
 			}
 
 			let capacity = self.parameters.capacity;
-			let _ = self
+			self
 				.available
-				.try_update(Ordering::AcqRel, Ordering::Acquire, |v| {
+				.update(Ordering::AcqRel, Ordering::Acquire, |v| {
 					if tokens_to_remove < 0 {
 						// Never exceed the capacity: `refill` assumes `available <= capacity`.
-						Some(
-							v.saturating_add(tokens_to_remove.unsigned_abs())
-								.min(capacity),
-						)
+						v.saturating_add(tokens_to_remove.unsigned_abs())
+							.min(capacity)
 					} else {
-						Some(v.saturating_sub(tokens_to_remove.unsigned_abs()))
+						v.saturating_sub(tokens_to_remove.unsigned_abs())
 					}
 				});
 		}
